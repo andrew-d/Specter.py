@@ -1,0 +1,11 @@
+[run]
+omit = specter/tests/*
+
+[report]
+exclude_lines =
+    .* # Platform-specific.*
+    except ImportError:
+    .*:.* # Python \d.*
+    pass
+    .* # Abstract
+    import

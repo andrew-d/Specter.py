@@ -18,19 +18,23 @@ def proxy_factory(type, underlying_getter):
             def fget(self, *args, **kwargs):
                 underlying = underlying_getter(self)
                 return proxy_to.fget(underlying, *args, **kwargs)
-            the_proxy = property(fget, doc=proxy_to.__doc__)
 
             if proxy_to.fset is not None:
                 def fset(self, *args, **kwargs):
                     underlying = underlying_getter(self)
                     return proxy_to.fset(underlying, *args, **kwargs)
-                the_proxy.fset = fset
+            else:
+                fset = None
 
             if proxy_to.fdel is not None:
                 def fdel(self, *args, **kwargs):
                     underlying = underlying_getter(self)
                     return proxy_to.fdel(underlying, *args, **kwargs)
-                the_proxy.fdel = fdel
+            else:
+                fdel = None
+
+            the_proxy = property(fget=fget, fset=fset, fdel=fdel,
+                                 doc=proxy_to.__doc__)
         else:
             @wraps(proxy_to)
             def the_proxy(self, *args, **kwargs):
@@ -55,3 +59,5 @@ def patch(obj, attr, value):
 
     if hasOld:
         setattr(obj, attr, old)
+    else:
+        delattr(obj, attr)
