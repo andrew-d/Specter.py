@@ -1,10 +1,11 @@
 import time
 import logging
 from numbers import Number
-from functools import wraps
-from contextlib import contextmanager
+from weakref import WeakKeyDictionary
 
 import blinker
+
+from .util import proxy_factory, patch
 
 PYSIDE = False
 try:
@@ -78,94 +79,106 @@ class QTMessageProxy(object):
         logger.log(level, "QT: " + msg)
 
 
-@contextmanager
-def set_value(obj, attr, value):
-    hasOld = False
-    old = None
-    if hasattr(obj, attr):
-        old = getattr(obj, attr)
-        hasOld = True
-
-    setattr(obj, attr, value)
-    yield
-
-    if hasOld:
-        setattr(obj, attr, old)
-
-
-class SpecterWebPage(QtWebKit.QWebPage):
-    def __init__(self, specter, signals):
-        super(SpecterWebPage, self).__init__(specter.app)
-
-        self.specter = specter
-        self.signals = signals
-
-        # Connect to QWebPage signals.
-        self.loadStarted.connect(self._loadStarted)
-        self.loadProgress.connect(self._loadProgress)
-        self.loadFinished.connect(self._loadFinished)
-        self.unsupportedContent.connect(self._unsupportedContent)
-
-    def _loadStarted(self):
-        self.signals.signal('loadStarted').send()
-
-    def _loadProgress(self, progress):
-        self.signals.signal('loadProgress').send(progress)
-
-    def _loadFinished(self, ok):
-        self.signals.signal('loadFinished').send(ok)
-
-    def _unsupportedContent(self, reply):
-        print('unsupported content!')
-
-    def chooseFile(self, frame, suggested_file=None):
-        return self.specter._file_to_upload
-
-    def javaScriptAlert(self, frame, message):
-        s = self.signals.signal('jsAlert')
-        f = self.specter._frame_mapping[frame]
-        s.send(f, message)
-
-    def javaScriptConfirm(self, frame, message):
-        s = self.signals.signal('jsConfirm')
-        if not s.receivers:
-            raise InteractionError("No handler set for JavaScript confirmation!")
-
-        f = self.specter._frame_mapping[frame]
-        ret = s.send(f, message)
-        return ret
-
-    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
-        s = self.signals.signal('jsPrompt')
-        if not s.receivers:
-            raise InteractionError("No handler set for JavaScript prompt!")
-
-        f = self.specter._frame_mapping[frame]
-        ret = s.send(f, message)
-
-        if result is None:
-            # PySide
-            return True, ret
-        else:
-            # PyQT
-            result.append(ret)
-            return True
-
-    def javaScriptConsoleMessage(self, frame, message, line, source):
-        super(SpecterWebPage, self).javaScriptConsoleMessage(message, line,
-            source)
-        s = self.signals.signal('jsConsole')
-        f = self.specter._frame_mapping[frame]
-        s.send(f, message, line, source)
-
-
-class WebFrame(object):
-    def __init__(self, underlying, page, is_main=False):
+class SpecterWebFrame(object):
+    def __init__(self, underlying, registry, app):
         self._frame = underlying
-        self._page = page
-        self.is_main = is_main
+        self.registry = registry
+        self.app = app
+        self._loaded = False
+        self._timeout = 90      # Matches 'network.http.connection-timeout'
+                                # from Firefox
+
+    # ----------------------------------------------------------------------
+    # ----------------------------- Properties -----------------------------
+    # ----------------------------------------------------------------------
+
+    @property
+    def timeout(self):
+        """
+        Returns the default timeout for wait operations.
+        """
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, val):
+        """
+        Set the new default timeout value.
+        """
+        self._timeout = float(val)
+
+    @property
+    def parent(self):
+        """
+        Return the parent frame of this frame, or None if this frame has no
+        parent.
+        """
+        raw = self._frame.parentFrame()
+        if raw is None:
+            return None
+        return self.registry.wrap(raw)
+
+    @property
+    def title(self):
+        """
+        Returns the title of the current frame, as set by the page's <title>
+        element.
+        """
+        return self._frame.title()
+
+    @property
+    def url(self):
+        """
+        Returns the URL of the frame currently being viewed.  Note that this
+        URL is not necessarily the same as the one that was originally
+        requested, due to redirections or DNS.  To obtain the originally-
+        requested URL, use :func:`requested_url`.
+        """
+        return self._frame.url().toString()
+
+    @property
+    def requested_url(self):
+        """
+        Returns the URL that was originally requested, before DNS resolution
+        or any redirection.
+        """
+        return self._frame.requestedUrl().toString()
+
+    @property
+    def name(self):
+        """
+        Returns the name of the frame, as set by the parent.  For example::
+
+            <html>
+              <body>
+                <frameset cols="50%,50%">
+                  <frame src="frame_a.htm" name="frame_a">
+                  <frame src="frame_b.htm" name="otherframe">
+                </frameset>
+              </body>
+            </html>
+
+        The names returned will be "frame_a" and "otherframe".
+        """
+        return self._frame.frameName()
+
+    @property
+    def content(self):
+        """
+        Returns a string containing the entire HTML content of this frame.
+        """
+        return self._frame.toHtml()
+
+    # ----------------------------------------------------------------------
+    # ------------------------------ Methods -------------------------------
+    # ----------------------------------------------------------------------
 
     def open(self, address, method="GET", **kwargs):
+        """
+        Open a URL in the current frame.
+
+        :param address: the url to open
+        :param method: the HTTP method to use.  Defaults to 'GET'.
+        """
         body = QByteArray()
         try:
             method = getattr(QNetworkAccessManager,
@@ -184,57 +197,48 @@ class WebFrame(object):
         self._frame.load(request, method, body)
 
     def wait_for(self, predicate, timeout=None):
-        # TODO: don't wait forever by default
+        """
+        Wait for a given predicate to be true, waiting up to :attr:`timeout`
+        seconds.  If the operaton times out, then a :class:`TimeoutError` will
+        be raised.
+
+        :param predicate: a callable that is called to determine if the wait
+                          operation has succeeded.
+        :param timeout: a timeout value, in seconds.  Fractional seconds (as
+                        a float) are accepted.
+        """
         if timeout is None:
-            timeout = float('inf')
+            timeout = self.timeout
 
         start = time.time()
         while time.time() < (start + timeout):
             if predicate():
                 return
-            self._page.app.processEvents()
+            self.app.processEvents()
             time.sleep(0.01)
 
         raise TimeoutError("Wait timed out")
 
     def sleep(self, duration):
+        """
+        Pause execution for the given duration.  Note that the underlying
+        WebKit instance will still continue to process events.
+
+        :param duration: the time to sleep for, in seconds.
+        """
         try:
             self.wait_for(lambda: False, duration)
         except TimeoutError:
             pass
 
-    @property
-    def parent(self):
-        raw = self._frame.parentFrame()
-        if raw is None:
-            return None
-        return self._page._frame_mapping[raw]
-
-    @property
-    def title(self):
-        return self._frame.title()
-
-    @property
-    def url(self):
-        return self._frame.url().toString()
-
-    @property
-    def requested_url(self):
-        return self._frame.requestedUrl().toString()
-
-    @property
-    def name(self):
-        return self._frame.frameName()
-
-    @property
-    def content(self):
-        return self._frame.toHtml()
-
-    # ----------------------------------------------------------------------
-    # Selector functions
     def exists(self, selector):
-        return not self._frame.findFirstElement(selector).isNull()
+        """
+        Returns whether or not an element matching the given CSS selector
+        exists in the current frame.
 
+        :param selector: a CSS selector.
+        """
+        return not self._frame.findFirstElement(selector).isNull()
 
     _text_fields = frozenset([
         'color', 'date', 'datetime', 'datetime-local', 'email', 'hidden',
@@ -242,6 +246,16 @@ class WebFrame(object):
         'time', 'url', 'week',
     ])
     def set_field_value(self, selector, value, blur=True):
+        """
+        Set the value of a field matching the given CSS selector the given
+        value.  If :attr:`blur` argument is True, then the field will lose
+        focus after the value has been entered.
+
+        :param selector: a CSS selector matching a valid element.
+        :param value: the value to set on the given element.
+        :param blur: whether or not to trigger a 'lose focus' event on the
+                     element.
+        """
         el = self._frame.findFirstElement(selector)
         if el.isNull():
             raise ElementError("Unable to find element for selector: %s" % (
@@ -279,10 +293,11 @@ class WebFrame(object):
                         radio.setAttribute('checked', 'checked')
 
             elif ty == 'file':
-                # Patch the file upload property to be our suggested value,
-                # trigger the click, and then remove it.  A context manager
-                # makes this easier.
-                with set_value(self._page, '_file_to_upload', value):
+                # We patch our parent page's file-upload value to be the given
+                # value, so that the following JavaScript will result in the
+                # given file being selected.
+                page = self.page()
+                with patch(page, '_file_to_upload', value):
                     # Trigger a click in Javascript.
                     self.evaluate("""
                         var element = document.querySelector("%s");
@@ -291,6 +306,10 @@ class WebFrame(object):
                             false, false, false, false, 0, element);
                         element.dispatchEvent(evt)
                     """ % selector)
+
+                    # Ensure events are processed.
+                    # TODO: want to do this?
+                    self.app.processEvents()
 
             else:
                 raise SpecterError('Unable to set the value of input field of '
@@ -304,176 +323,195 @@ class WebFrame(object):
             self.fire_on(selector, 'blur')
 
     def evaluate(self, script):
+        """
+        Evaluate the given JavaScript in the context of the current frame.
+
+        :param script: The JavaScript to execute.
+        """
         self._frame.evaluateJavaScript(str(script))
         # TODO: handle return value
 
     def fire_on(self, selector, event):
+        """
+        Trigger an event on the given selector.
+
+        :param selector: a CSS selector.
+        :param event: the event to trigger.
+        """
         self.evaluate('document.querySelector("%s").%s();' % (selector, event))
 
-    # ----------------------------------------------------------------------
-    # Helpful wait functions
     def wait_for_selector(self, selector):
+        """
+        Wait for an element matching the given CSS selector to exist in the
+        current frame.
+
+        :param selector: a CSS selector.
+        """
         return self.wait_for(lambda: self.exists(selector))
 
     def wait_while_selector(self, selector):
+        """
+        Wait until an element matching the given CSS selector does not exist in
+        the current frame.
+
+        :param selector: a CSS selector.
+        """
         return self.wait_for(lambda: not self.exists(selector))
 
     def wait_for_text(self, text):
+        """
+        Waits until the given text is present in the current frame.
+
+        :param text: the text to search for.
+        """
         return self.wait_for(lambda: text in self.content)
 
     def wait_for_page_load(self):
-        return self.wait_for(lambda: self._page._loaded == True)
+        """
+        Wait until the current frame has finished loading.
+        """
+        page = self._frame.page()
+        return self.wait_for(lambda: page.loaded == True)
 
 
-def _frame_proxy(name):
+class FrameRegistry(object):
     """
-    Proxy a given method or property from an underlying object to the
-    current class.
+    This class implements a method to keep track of wrapped frames.  In short,
+    Qt will give us frames that are QWebFrames, and we want to only deal with
+    WebFrames that we control.  This registry will either wrap a given frame,
+    or return the previously-wrapped one from the registry.
     """
+    def __init__(self, *args, **kwargs):
+        self._registry = WeakKeyDictionary()
+        self.args = args
+        self.kwargs = kwargs
 
-    f = getattr(WebFrame, name)
-    if isinstance(f, property):
-        def fget(self, *args, **kwargs):
-            return f.fget(self._main_frame, *args, **kwargs)
-        _proxy = property(fget, doc=f.__doc__)
+    def wrap(self, frame):
+        if frame is None:
+            return None
 
-        if f.fset is not None:
-            def fset(self, *args, **kwargs):
-                return f.fset(self._main_frame, *args, **kwargs)
-            _proxy.fset = fset
+        existing = self._registry.get(frame)
+        if existing is not None:
+            return existing
 
-        if f.fdel is not None:
-            def fdel(self, *args, **kwargs):
-                return f.fdel(self._main_frame, *args, **kwargs)
-            _proxy.fdel = fdel
-    else:
-        @wraps(f)
-        def _proxy(self, *args, **kwargs):
-            return f(self._main_frame, *args, **kwargs)
+        # Create web frame, passing the underlying value, and ourselves.
+        new = SpecterWebFrame(frame, self, *self.args, **self.kwargs)
+        self._registry[frame] = new
+        return new
 
-    return _proxy
+    def clear(self):
+        del self._registry[:]
 
 
-class SizedWebView(QtWebKit.QWebView):
-    def __init__(self, size, *args, **kwargs):
-        self.__size = size
-        super(SizedWebView, self).__init__(*args, **kwargs)
+frame_proxy = proxy_factory(SpecterWebFrame, lambda self: self._main_frame)
 
-    def sizeHint(self):
-        return QSize(*self.__size)
+class SpecterWebPage(QtWebKit.QWebPage):
+    def __init__(self, app, signals, registry):
+        super(SpecterWebPage, self).__init__(app)
 
+        self.signals = signals
+        self.registry = registry
+        self.loaded = False
 
-class Specter(object):
-    """
-    Main object
-    """
-
-    _app = None
-
-    @property
-    def app(self):
-        if not Specter._app:
-            Specter._app = QApplication.instance() or QApplication(['specter'])
-            qInstallMsgHandler(QTMessageProxy(False))
-
-        return Specter._app
-
-    def __init__(self, **options):
-        self.signals = blinker.Namespace()
-        self.page = SpecterWebPage(self, self.signals)
-
-        QtWebKit.QWebSettings.setMaximumPagesInCache(0)
-        QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
-        QtWebKit.QWebSettings.globalSettings().setAttribute(
-            QtWebKit.QWebSettings.LocalStorageEnabled,
-            options.get('local_storage', True)
-        )
-
-        self.page.setForwardUnsupportedContent(True)
-
-        self.page.settings().setAttribute(
-            QtWebKit.QWebSettings.AutoLoadImages,
-            options.get('load_images', True)
-        )
-        self.page.settings().setAttribute(
-            QtWebKit.QWebSettings.PluginsEnabled,
-            options.get('enable_plugins', True)
-        )
-        self.page.settings().setAttribute(
-            QtWebKit.QWebSettings.JavaEnabled,
-            options.get('enable_java', True)
-        )
-
-        # When a frame is created, we create a wrapper object for it.
-        self.page.frameCreated.connect(self._frame_created)
-        self._frame_mapping = {}
-
-        # We save the main frame explicitly.
-        underlying = self.page.mainFrame()
-        frameObj = WebFrame(underlying, self, is_main=True)
-        self._main_frame = frameObj
-        self._underlying = underlying
-        self._frame_mapping[underlying] = frameObj
-
-        # Page load status
-        self._loaded = False
-        self.page.loadStarted.connect(self._page_load_started)
-        self.page.loadFinished.connect(self._page_load_finished)
-
-        # Size
-        self._viewport_size = options.get('viewport_size', (800, 600))
-
-        # File to upload (defaults to None - i.e. nothing).
+        # This gets patched by sub-frames.  Sadly, no nicer way.
         self._file_to_upload = None
 
-        self.webview = None
-        if options.get('display', False):
-            self.webview = SizedWebView(self._viewport_size)
-            self.webview.setPage(self.page)
-            self.webview.show()
-
-    def __del__(self):
-        if self.webview is not None:
-            self.webview.close()
-        self.app.quit()
-
-        del self.page
-        del self._main_frame
-
-    def _frame_created(self, frame):
-        self._frame_mapping[frame] = WebFrame(frame, self)
-
-    def _page_load_started(self):
-        self._loaded = False
-        self._frame_mapping = {self._underlying: self._main_frame}
-
-    def _page_load_finished(self, ok):
-        self._loaded = True
+        # Connect to QWebPage signals.
+        self.loadStarted.connect(self.onLoadStarted)
+        self.loadProgress.connect(self.onLoadProgress)
+        self.loadFinished.connect(self.onLoadFinished)
+        self.unsupportedContent.connect(self.onUnsupportedContent)
 
     @property
     def main_frame(self):
-        return self._main_frame
+        return self.registry.wrap(self.mainFrame())
 
-    @property
-    def viewport_size(self):
-        return self._viewport_size
+    # ----------------------------------------------------------------------
+    # ------------------------------ Signals -------------------------------
+    # ----------------------------------------------------------------------
 
-    @viewport_size.setter
-    def viewport_size(self, newSize):
-        self._viewport_size = newSize
-        self.page.setViewportSize(QSize(*newSize))
+    def onLoadStarted(self):
+        self.loaded = False
+        self.signals.signal('loadStarted').send()
+
+    def onLoadProgress(self, progress):
+        self.signals.signal('loadProgress').send(progress)
+
+    def onLoadFinished(self, ok):
+        self.loaded = True
+        self.signals.signal('loadFinished').send(ok)
+
+    def onUnsupportedContent(self, reply):
+        print('unsupported content!')
+
+    # ----------------------------------------------------------------------
+    # -------------------------- Abstract Methods --------------------------
+    # ----------------------------------------------------------------------
+
+    def chooseFile(self, frame, suggested_file=None):
+        return self._file_to_upload
+
+    def javaScriptAlert(self, frame, message):
+        s = self.signals.signal('jsAlert')
+        s.send(self.registry.wrap(frame), message)
+
+    def javaScriptConfirm(self, frame, message):
+        s = self.signals.signal('jsConfirm')
+        if not s.receivers:
+            raise InteractionError("No handler set for JavaScript confirmation!")
+
+        ret = s.send(self.registry.wrap(frame), message)
+        return ret
+
+    def javaScriptPrompt(self, frame, message, defaultValue, result=None):
+        s = self.signals.signal('jsPrompt')
+        if not s.receivers:
+            raise InteractionError("No handler set for JavaScript prompt!")
+
+        ret = s.send(self.registry.wrap(frame), message)
+
+        # NOTE: The final 'result' parameter differs between PySide and PyQt.
+        if result is None:
+            # PySide
+            return True, ret
+        else:
+            # PyQT
+            result.append(ret)
+            return True
+
+    def javaScriptConsoleMessage(self, frame, message, line, source):
+        super(SpecterWebPage, self).javaScriptConsoleMessage(message, line,
+            source)
+        s = self.signals.signal('jsConsole')
+        s.send(self.registry.wrap(frame), message, line, source)
+
+    # ----------------------------------------------------------------------
+    # ------------------------- Page-Level Methods -------------------------
+    # ----------------------------------------------------------------------
 
     def go_back(self):
-        self.page.triggerAction(QtWebKit.QWebPage.Back)
+        """
+        Go back to the previous page in the browser history.
+        """
+        self.triggerAction(QtWebKit.QWebPage.Back)
 
     def go_forward(self):
-        self.page.triggerAction(QtWebKit.QWebPage.Forward)
+        """
+        Go forward to the next page in the browser history.
+        """
+        self.triggerAction(QtWebKit.QWebPage.Forward)
 
     def stop(self):
-        self.page.triggerAction(QtWebKit.QWebPage.Stop)
+        """
+        Stop the page from loading any further.
+        """
+        self.triggerAction(QtWebKit.QWebPage.Stop)
 
     def reload(self):
-        self.page.triggerAction(QtWebKit.QWebPage.Reload)
+        """
+        Reload the current page.
+        """
+        self.triggerAction(QtWebKit.QWebPage.Reload)
 
     _mouse_mapping = {
         'mousedown': QtCore.QEvent.MouseButtonPress,
@@ -482,6 +520,19 @@ class Specter(object):
         'mousemove': QtCore.QEvent.MouseMove,
     }
     def send_mouse_event(self, type, x, y, button='left'):
+        """
+        Send a mouseclick to the current page, with parameters specified by
+        the arguments given.
+
+        :param type: the type of event to send.  Valid types are 'mousedown',
+                     'mouseup', 'mousemove', 'doubleclick', and 'click'.
+        :param x: the X-coordinate on which to click.
+        :param y: the Y-coordinate on which to click.
+        :param button: the button to click with.  Defaults to the left mouse
+                       button.
+        """
+
+        # TODO: x, y relative to what?
         if type == 'click':
             # Not provided by Qt, so we just send two events.
             self.send_mouse_event('mousedown', x, y, button)
@@ -505,9 +556,20 @@ class Specter(object):
 
         event = QMouseEvent(eventType, (x, y), buttonObj, buttonObj,
                             QtCore.Qt.NoModifier)
-        self._page.app.postEvent(self._page.page, event)
+        self.app.postEvent(self, event)
 
     def send_keyboard_event(self, type, keys, modifiers=None):
+        """
+        Send a keyboard event to the current page, with parameters specified by
+        the arguments given.
+
+        :param type: the type of event to send.  Valid types are 'keydown',
+                     'keyup', and 'keypress'.
+        :param keys: the key to send.  If this is a number, it's assumed to be
+                     the keycode to send - otherwise, the keycode of the first
+                     character in the given iterable is used.
+        :param modifiers: modifier keys for the given event.
+        """
         if type == 'keypress':
             # TODO: implement
             return
@@ -525,27 +587,147 @@ class Specter(object):
         elif isinstance(keys, str) and len(keys) > 0:
             key = ord(keys[0])
 
+        # TODO: modifiers
         if modifiers is None:
             modifiers = QtCore.Qt.NoModifier
 
         event = QKeyEvent(eventType, key, modifiers)
+        self.app.postEvent(self, event)
+
+    # ----------------------------------------------------------------------
+    # --------------------- Frame-Level Proxy Methods ----------------------
+    # ----------------------------------------------------------------------
 
     # Proxy some methods from the main frame to the web page.
-    open                = _frame_proxy('open')
-    wait_for            = _frame_proxy('wait_for')
-    sleep               = _frame_proxy('sleep')
-    wait_for_selector   = _frame_proxy('wait_for_selector')
-    wait_while_selector = _frame_proxy('wait_while_selector')
-    wait_for_text       = _frame_proxy('wait_for_text')
-    wait_for_page_load  = _frame_proxy('wait_for_page_load')
-    exists              = _frame_proxy('exists')
-    evaluate            = _frame_proxy('evaluate')
-    set_field_value     = _frame_proxy('set_field_value')
-    fire_on             = _frame_proxy('fire_on')
+    open                = frame_proxy('open')
+    wait_for            = frame_proxy('wait_for')
+    sleep               = frame_proxy('sleep')
+    wait_for_selector   = frame_proxy('wait_for_selector')
+    wait_while_selector = frame_proxy('wait_while_selector')
+    wait_for_text       = frame_proxy('wait_for_text')
+    wait_for_page_load  = frame_proxy('wait_for_page_load')
+    exists              = frame_proxy('exists')
+    evaluate            = frame_proxy('evaluate')
+    set_field_value     = frame_proxy('set_field_value')
+    fire_on             = frame_proxy('fire_on')
 
     # Proxy properties
-    url             = _frame_proxy('url')
-    requested_url   = _frame_proxy('requested_url')
-    title           = _frame_proxy('title')
-    name            = _frame_proxy('name')
-    content         = _frame_proxy('content')
+    url             = frame_proxy('url')
+    requested_url   = frame_proxy('requested_url')
+    title           = frame_proxy('title')
+    name            = frame_proxy('name')
+    content         = frame_proxy('content')
+
+
+class SizedWebView(QtWebKit.QWebView):
+    def __init__(self, size, *args, **kwargs):
+        self.__size = size
+        super(SizedWebView, self).__init__(*args, **kwargs)
+
+    def sizeHint(self):
+        return QSize(*self.__size)
+
+
+page_proxy = proxy_factory(SpecterWebPage, lambda self: self.page)
+page_frame_proxy = proxy_factory(SpecterWebFrame, lambda self: self.page.main_frame)
+
+class Specter(object):
+    """
+    The main object that contains a single web page and all the associated
+    information - for example, the display.  This proxies some methods from the
+    page to the current object, for convenience.
+    """
+
+    _app = None
+
+    @property
+    def app(self):
+        if not Specter._app:
+            Specter._app = QApplication.instance() or QApplication(['specter'])
+            qInstallMsgHandler(QTMessageProxy(False))
+
+        return Specter._app
+
+    def __init__(self, **options):
+        self.signals = blinker.Namespace()
+        self.webview = None
+        self.frame_registry = FrameRegistry(self.app)
+        self.page = SpecterWebPage(self.app, self.signals, self.frame_registry)
+
+        QtWebKit.QWebSettings.setMaximumPagesInCache(0)
+        QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
+        QtWebKit.QWebSettings.globalSettings().setAttribute(
+            QtWebKit.QWebSettings.LocalStorageEnabled,
+            options.get('local_storage', True)
+        )
+
+        self.page.setForwardUnsupportedContent(True)
+
+        self.page.settings().setAttribute(
+            QtWebKit.QWebSettings.AutoLoadImages,
+            options.get('load_images', True)
+        )
+        self.page.settings().setAttribute(
+            QtWebKit.QWebSettings.PluginsEnabled,
+            options.get('enable_plugins', True)
+        )
+        self.page.settings().setAttribute(
+            QtWebKit.QWebSettings.JavaEnabled,
+            options.get('enable_java', True)
+        )
+
+        # Size
+        self.viewport_size = options.get('viewport_size', (800, 600))
+
+        # Create webview if we are to display things.
+        if options.get('display', False):
+            self.webview = SizedWebView(self._viewport_size)
+            self.webview.setPage(self.page)
+            self.webview.show()
+
+    def __del__(self):
+        if self.webview is not None:
+            self.webview.close()
+        self.app.quit()
+
+        del self.page
+
+    @property
+    def viewport_size(self):
+        """
+        Returns the given viewport size.
+        """
+        return self._viewport_size
+
+    @viewport_size.setter
+    def viewport_size(self, newSize):
+        self._viewport_size = newSize
+        self.page.setViewportSize(QSize(*newSize))
+
+    # Page-level functions.
+    go_back             = page_proxy('go_back')
+    go_forward          = page_proxy('go_forward')
+    stop                = page_proxy('stop')
+    reload              = page_proxy('reload')
+    send_mouse_event    = page_proxy('send_mouse_event')
+    send_keyboard_event = page_proxy('send_keyboard_event')
+
+    # Proxy some methods from the main frame.
+    open                = page_frame_proxy('open')
+    wait_for            = page_frame_proxy('wait_for')
+    sleep               = page_frame_proxy('sleep')
+    wait_for_selector   = page_frame_proxy('wait_for_selector')
+    wait_while_selector = page_frame_proxy('wait_while_selector')
+    wait_for_text       = page_frame_proxy('wait_for_text')
+    wait_for_page_load  = page_frame_proxy('wait_for_page_load')
+    exists              = page_frame_proxy('exists')
+    evaluate            = page_frame_proxy('evaluate')
+    set_field_value     = page_frame_proxy('set_field_value')
+    fire_on             = page_frame_proxy('fire_on')
+
+    # Proxy properties
+    url             = page_frame_proxy('url')
+    requested_url   = page_frame_proxy('requested_url')
+    title           = page_frame_proxy('title')
+    name            = page_frame_proxy('name')
+    content         = page_frame_proxy('content')

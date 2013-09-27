@@ -20,7 +20,7 @@ from tornado import netutil
 
 from bottle import Bottle
 
-sys.path.insert(0, path.abspath(path.join(path.dirname(__file__), '..')))
+sys.path.insert(0, path.abspath(path.join(path.dirname(__file__), '..', '..')))
 from specter import Specter
 
 
@@ -84,6 +84,8 @@ class SpecterTestCase(unittest.TestCase):
     def tearDown(self):
         # Tell our thread to stop.
         self.thread.stop()
+
+        print(dict(self.s.frame_registry._registry))
 
     # ----------------------------------------------------------------------
     # Utility functions
