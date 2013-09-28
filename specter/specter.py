@@ -198,7 +198,7 @@ class SpecterWebFrame(object):
             method = getattr(QNetworkAccessManager,
                              "%sOperation" % method.capitalize())
         except AttributeError:
-            raise Error("Invalid http method %s" % method)
+            raise SpecterError("Invalid http method %s" % method)
 
         request = QNetworkRequest(QUrl(address))
         request.CacheLoadControl(0)
@@ -259,6 +259,7 @@ class SpecterWebFrame(object):
         'month', 'number', 'password', 'range', 'search', 'tel', 'text',
         'time', 'url', 'week',
     ])
+
     def set_field_value(self, selector, value, blur=True):
         """
         Set the value of a field matching the given CSS selector the given
@@ -316,8 +317,8 @@ class SpecterWebFrame(object):
                     self.evaluate("""
                         var element = document.querySelector("%s");
                         var evt = document.createEvent("MouseEvents");
-                        evt.initMouseEvent("click", true, true, window, 1, 1, 1, 1, 1,
-                            false, false, false, false, 0, element);
+                        evt.initMouseEvent("click", true, true, window, 1, 1,
+                              1, 1, 1, false, false, false, false, 0, element);
                         element.dispatchEvent(evt)
                     """ % selector)
 
@@ -385,7 +386,7 @@ class SpecterWebFrame(object):
         Wait until the current frame has finished loading.
         """
         page = self._frame.page()
-        return self.wait_for(lambda: page.loaded == True)
+        return self.wait_for(lambda: page.loaded is True)
 
 
 class FrameRegistry(object):
@@ -418,6 +419,7 @@ class FrameRegistry(object):
 
 
 frame_proxy = proxy_factory(SpecterWebFrame, lambda self: self._main_frame)
+
 
 class SpecterWebPage(QtWebKit.QWebPage):
     def __init__(self, app, signals, registry):
@@ -472,7 +474,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
     def javaScriptConfirm(self, frame, message):
         s = self.signals.signal('jsConfirm')
         if not s.receivers:
-            raise InteractionError("No handler set for JavaScript confirmation!")
+            raise InteractionError("No handler set for JavaScript confirm!")
 
         ret = s.send(self.registry.wrap(frame), message)
         return ret
@@ -495,7 +497,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
 
     def javaScriptConsoleMessage(self, frame, message, line, source):
         super(SpecterWebPage, self).javaScriptConsoleMessage(message, line,
-            source)
+                                                             source)
         s = self.signals.signal('jsConsole')
         s.send(self.registry.wrap(frame), message, line, source)
 
@@ -533,6 +535,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
         'doubleclick': QtCore.QEvent.MouseButtonDblClick,
         'mousemove': QtCore.QEvent.MouseMove,
     }
+
     def send_mouse_event(self, type, x, y, button='left'):
         """
         Send a mouseclick to the current page, with parameters specified by
@@ -643,7 +646,9 @@ class SizedWebView(QtWebKit.QWebView):
 
 
 page_proxy = proxy_factory(SpecterWebPage, lambda self: self.page)
-page_frame_proxy = proxy_factory(SpecterWebFrame, lambda self: self.page.main_frame)
+page_frame_proxy = proxy_factory(SpecterWebFrame,
+                                 lambda self: self.page.main_frame)
+
 
 class Specter(object):
     """

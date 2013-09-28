@@ -5,7 +5,6 @@
 #   - Run a test on Specter
 #   - Assert some result.
 
-import os
 import sys
 import socket
 import unittest

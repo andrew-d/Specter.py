@@ -1,6 +1,7 @@
 import unittest
 
-from util import SpecterTestCase
+# Import this so the paths are added to sys.path as a side-effect.
+from util import SpecterTestCase        # noqa
 
 from specter.util import proxy_factory, patch
 
@@ -68,4 +69,3 @@ class TestPatch(unittest.TestCase):
         with patch(self, 'nonexisting', 3):
             self.assertEqual(self.nonexisting, 3)
         self.assertFalse(hasattr(self, 'nonexisting'))
-
