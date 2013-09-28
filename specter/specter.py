@@ -168,6 +168,20 @@ class SpecterWebFrame(object):
         """
         return self._frame.toHtml()
 
+    @property
+    def child_frames(self):
+        """
+        Returns an array of all child frames of this frame.
+        """
+        ret = []
+
+        children = self._frame.childFrames()
+        for child in children:
+            if isinstance(child, QtWebKit.QWebFrame):
+                ret.append(self.registry.wrap(child))
+
+        return ret
+
     # ----------------------------------------------------------------------
     # ------------------------------ Methods -------------------------------
     # ----------------------------------------------------------------------
