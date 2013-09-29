@@ -9,3 +9,4 @@ exclude_lines =
     pass
     .* # Abstract
     import
+    .* # pragma: no cover$

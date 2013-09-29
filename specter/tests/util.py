@@ -5,6 +5,7 @@
 #   - Run a test on Specter
 #   - Assert some result.
 
+import os
 import sys
 import socket
 import unittest
@@ -17,7 +18,7 @@ import tornado.ioloop
 import tornado.wsgi
 from tornado import netutil
 
-from bottle import Bottle
+from bottle import Bottle, static_file
 
 sys.path.insert(0, path.abspath(path.join(path.dirname(__file__), '..', '..')))
 from specter import Specter
@@ -79,19 +80,41 @@ class SpecterTestCase(unittest.TestCase):
         # Get info about the server.
         self.port = self.thread.port
         self.host = self.thread.host
+        self.baseUrl = "http://%s:%d" % (self.host, self.port)
 
     def tearDown(self):
         # Tell our thread to stop.
         self.thread.stop()
 
-        print(dict(self.s.frame_registry._registry))
-
     # ----------------------------------------------------------------------
     # Utility functions
     # ----------------------------------------------------------------------
 
-    def open(self, path):
+    def open(self, path, wait=True):
         """Helper that prefixes with our local address."""
         prefix = "http://%s:%d/" % (self.host, self.port)
         url = prefix + path.lstrip('/')
-        return self.s.open(url)
+        ret = self.s.open(url)
+        if wait:
+            self.s.wait_for_page_load()
+        return ret
+
+
+class StaticSpecterTestCase(SpecterTestCase):
+    STATIC_FILE = ''
+
+    def setupApp(self, app):
+        root = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            'static'
+        )
+
+        @app.route('/<path:path>')
+        def rest(path):
+            print("Serving static file: %s" % (path,))
+            return static_file(filename=path, root=root)
+
+        @app.route('/')
+        def index():
+            print("Serving static file: %s" % (self.STATIC_FILE,))
+            return static_file(filename=self.STATIC_FILE, root=root)

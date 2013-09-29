@@ -2,10 +2,13 @@ import time
 import logging
 from numbers import Number
 from weakref import WeakKeyDictionary
+from enum import IntEnum
 
 import blinker
 
 from .util import proxy_factory, patch
+from .signals import *
+from .exceptions import *
 
 PYSIDE = False
 try:
@@ -40,26 +43,6 @@ except ImportError:
 logger = logging.getLogger('specter')
 
 
-class SpecterError(Exception):
-    """Base class for all errors from Specter. """
-    pass
-
-
-class TimeoutError(SpecterError):
-    """Error raised when a network operation times out."""
-    pass
-
-
-class InteractionError(SpecterError):
-    """Error raised when there's no handlers listening for a prompt."""
-    pass
-
-
-class ElementError(SpecterError):
-    """Error raised when Specter is unable to find an element."""
-    pass
-
-
 class QTMessageProxy(object):
     _mapping = {
         QtDebugMsg: logging.DEBUG,
@@ -77,6 +60,14 @@ class QTMessageProxy(object):
             return
 
         logger.log(level, "QT: " + msg)
+
+
+class Modifiers(IntEnum):
+    Alt = int(QtCore.Qt.KeyboardModifier.AltModifier)
+    Control = int(QtCore.Qt.KeyboardModifier.ControlModifier)
+    Meta = int(QtCore.Qt.KeyboardModifier.MetaModifier)
+    Shift = int(QtCore.Qt.KeyboardModifier.ShiftModifier)
+    No = int(QtCore.Qt.KeyboardModifier.NoModifier)
 
 
 class SpecterWebFrame(object):
@@ -255,7 +246,7 @@ class SpecterWebFrame(object):
         return not self._frame.findFirstElement(selector).isNull()
 
     _text_fields = frozenset([
-        'color', 'date', 'datetime', 'datetime-local', 'email', 'hidden',
+        '', 'color', 'date', 'datetime', 'datetime-local', 'email', 'hidden',
         'month', 'number', 'password', 'range', 'search', 'tel', 'text',
         'time', 'url', 'week',
     ])
@@ -269,7 +260,7 @@ class SpecterWebFrame(object):
         :param selector: a CSS selector matching a valid element.
         :param value: the value to set on the given element.
         :param blur: whether or not to trigger a 'lose focus' event on the
-                     element.
+                     element. Defaults to True.
         """
         el = self._frame.findFirstElement(selector)
         if el.isNull():
@@ -279,7 +270,12 @@ class SpecterWebFrame(object):
         tag = el.tagName().lower()
         if tag == 'select':
             el.setFocus()
-            # TODO: evaluate JS to set value
+            # Trigger this change via JavaScript.
+            code = 'document.querySelector("%s").value = "%s";' % (
+                selector.replace('"', '\"'),
+                value.replace('"', '\"')
+            )
+            self.evaluate(code)
 
         elif tag == 'textarea':
             el.setFocus()
@@ -396,8 +392,9 @@ class FrameRegistry(object):
     WebFrames that we control.  This registry will either wrap a given frame,
     or return the previously-wrapped one from the registry.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, klass, *args, **kwargs):
         self._registry = WeakKeyDictionary()
+        self.klass = klass
         self.args = args
         self.kwargs = kwargs
 
@@ -410,7 +407,7 @@ class FrameRegistry(object):
             return existing
 
         # Create web frame, passing the underlying value, and ourselves.
-        new = SpecterWebFrame(frame, self, *self.args, **self.kwargs)
+        new = self.klass(frame, self, *self.args, **self.kwargs)
         self._registry[frame] = new
         return new
 
@@ -418,14 +415,14 @@ class FrameRegistry(object):
         del self._registry[:]
 
 
+# FIXME: This won't handle custom classes
 frame_proxy = proxy_factory(SpecterWebFrame, lambda self: self._main_frame)
 
 
 class SpecterWebPage(QtWebKit.QWebPage):
-    def __init__(self, app, signals, registry):
+    def __init__(self, app, registry):
         super(SpecterWebPage, self).__init__(app)
 
-        self.signals = signals
         self.registry = registry
         self.loaded = False
 
@@ -448,16 +445,17 @@ class SpecterWebPage(QtWebKit.QWebPage):
 
     def onLoadStarted(self):
         self.loaded = False
-        self.signals.signal('loadStarted').send()
+        load_started.send(self)
 
     def onLoadProgress(self, progress):
-        self.signals.signal('loadProgress').send(progress)
+        load_progress.send(self, progress=progress)
 
     def onLoadFinished(self, ok):
         self.loaded = True
-        self.signals.signal('loadFinished').send(ok)
+        load_finished.send(self, ok=ok)
 
     def onUnsupportedContent(self, reply):
+        # TODO: fix
         print('unsupported content!')
 
     # ----------------------------------------------------------------------
@@ -468,38 +466,49 @@ class SpecterWebPage(QtWebKit.QWebPage):
         return self._file_to_upload
 
     def javaScriptAlert(self, frame, message):
-        s = self.signals.signal('jsAlert')
-        s.send(self.registry.wrap(frame), message)
+        js_alert.send(self.registry.wrap(frame), message=message)
 
     def javaScriptConfirm(self, frame, message):
-        s = self.signals.signal('jsConfirm')
-        if not s.receivers:
+        if not js_confirm.receivers:
             raise InteractionError("No handler set for JavaScript confirm!")
 
-        ret = s.send(self.registry.wrap(frame), message)
-        return ret
+        ret = js_confirm.send(self.registry.wrap(frame), message=message)
+
+        # Take the first boolean value.
+        response = False
+        for responder, val in ret:
+            if isinstance(val, bool):
+                response = val
+                break
+
+        return response
 
     def javaScriptPrompt(self, frame, message, defaultValue, result=None):
-        s = self.signals.signal('jsPrompt')
-        if not s.receivers:
+        if not js_prompt.receivers:
             raise InteractionError("No handler set for JavaScript prompt!")
 
-        ret = s.send(self.registry.wrap(frame), message)
+        ret = js_prompt.send(self.registry.wrap(frame),
+                             message=message, default=defaultValue)
+
+        # We take the first non-empty return value, since blinker returns all
+        # return values as a list.
+        response = ''
+        for responder, val in ret:
+            if len(val) > 0 and isinstance(val, str):
+                response = val
+                break
 
         # NOTE: The final 'result' parameter differs between PySide and PyQt.
-        if result is None:
-            # PySide
-            return True, ret
-        else:
-            # PyQT
-            result.append(ret)
+        if result is None:      # pragma: no cover
+            return True, response
+        else:                   # pragma: no cover
+            result.append(response)
             return True
 
-    def javaScriptConsoleMessage(self, frame, message, line, source):
+    def javaScriptConsoleMessage(self, message, line, source):
         super(SpecterWebPage, self).javaScriptConsoleMessage(message, line,
                                                              source)
-        s = self.signals.signal('jsConsole')
-        s.send(self.registry.wrap(frame), message, line, source)
+        js_console.send(self, message=message, line=line, source=source)
 
     # ----------------------------------------------------------------------
     # ------------------------- Page-Level Methods -------------------------
@@ -574,6 +583,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
         event = QMouseEvent(eventType, (x, y), buttonObj, buttonObj,
                             QtCore.Qt.NoModifier)
         self.app.postEvent(self, event)
+        # TODO: process events?
 
     def send_keyboard_event(self, type, keys, modifiers=None):
         """
@@ -604,12 +614,12 @@ class SpecterWebPage(QtWebKit.QWebPage):
         elif isinstance(keys, str) and len(keys) > 0:
             key = ord(keys[0])
 
-        # TODO: modifiers
         if modifiers is None:
-            modifiers = QtCore.Qt.NoModifier
+            modifiers = Modifiers.No
 
         event = QKeyEvent(eventType, key, modifiers)
         self.app.postEvent(self, event)
+        # TODO: process events?
 
     # ----------------------------------------------------------------------
     # --------------------- Frame-Level Proxy Methods ----------------------
@@ -645,6 +655,7 @@ class SizedWebView(QtWebKit.QWebView):
         return QSize(*self.__size)
 
 
+# FIXME: these won't handle custom classes!
 page_proxy = proxy_factory(SpecterWebPage, lambda self: self.page)
 page_frame_proxy = proxy_factory(SpecterWebFrame,
                                  lambda self: self.page.main_frame)
@@ -668,10 +679,11 @@ class Specter(object):
         return Specter._app
 
     def __init__(self, **options):
-        self.signals = blinker.Namespace()
         self.webview = None
-        self.frame_registry = FrameRegistry(self.app)
-        self.page = SpecterWebPage(self.app, self.signals, self.frame_registry)
+        self.FrameClass = options.get('frame_class', SpecterWebFrame)
+        self.PageClass = options.get('page_class', SpecterWebPage)
+        self.frame_registry = FrameRegistry(self.FrameClass, self.app)
+        self.page = self.PageClass(self.app, self.frame_registry)
 
         QtWebKit.QWebSettings.setMaximumPagesInCache(0)
         QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
@@ -704,7 +716,7 @@ class Specter(object):
             self.webview.setPage(self.page)
             self.webview.show()
 
-    def __del__(self):
+    def __del__(self):                      # pragma: no cover
         if self.webview is not None:
             self.webview.close()
         self.app.quit()

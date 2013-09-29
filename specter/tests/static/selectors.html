@@ -1,0 +1,26 @@
+<html>
+  <body>
+    <div id='the_id'>
+      Content 1
+    </div>
+    <div class='the_class'>
+      Content 2
+    </div>
+    <div id='deleteme'>
+    </div>
+
+    <script>
+      setTimeout(function() {
+          var n = document.createElement('div');
+          n.setAttribute('id', 'created_id');
+          n.setAttribute('class', 'created_class');
+          document.body.appendChild(n);
+      }, 500);
+
+      setTimeout(function() {
+          var el = document.getElementById('deleteme');
+          el.parentNode.removeChild(el);
+      }, 500);
+    </script>
+  </body>
+</html>
