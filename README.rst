@@ -3,8 +3,8 @@ Specter.py
 
 Specter.py allows you to automate WebKit through Python, making tasks such as
 web scraping and web application testing easier.  It uses QWebKit from the Qt
-project through the [PySide](http://qt-project.org/wiki/PySide) or
-[PyQt](http://www.riverbankcomputing.com/software/pyqt/intro) projects.
+project through the `PySide <http://qt-project.org/wiki/PySide>`_ or
+`PyQt <http://www.riverbankcomputing.com/software/pyqt/intro>`_ projects.
 
 
 Documentation
