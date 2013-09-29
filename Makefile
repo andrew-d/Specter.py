@@ -1,4 +1,4 @@
-.PHONY: test doc clean
+.PHONY: test watch_test check doc clean
 
 # Can specify parallelism on command line.
 PARALLELISM ?= 0
