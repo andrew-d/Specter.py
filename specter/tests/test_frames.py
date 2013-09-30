@@ -1,22 +1,11 @@
 import os
 
-from util import SpecterTestCase
+from util import StaticSpecterTestCase
 from bottle import static_file
 
-class TestFrames(SpecterTestCase):
-    def setupApp(self, app):
-        root_dir = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)),
-            "static"
-        )
 
-        @app.route('/<path:path>')
-        def callback(path):
-            return static_file(path, root=root_dir)
-
-        @app.route('/')
-        def index():
-            return static_file('frames.html', root=root_dir)
+class TestFrames(StaticSpecterTestCase):
+    STATIC_FILE = 'frames.html'
 
     def test_frame_names(self):
         self.open('/')
