@@ -62,6 +62,27 @@ class QTMessageProxy(object):
         logger.log(level, "QT: " + msg)
 
 
+class NetworkAccessManager(QNetworkAccessManager):
+    def __init__(self, parent=None):
+        QNetworkAccessManager.__init__(self, parent=parent)
+        self._ignore_ssl_errors = False
+
+        self.sslErrors.connect(self.handleSslErrors)
+
+    def handleSslErrors(self, reply, errors):
+        ssl_error.send(self, errors=errors)
+        if self._ignore_ssl_errors:
+            reply.ignoreSslErrors()
+
+    @property
+    def ignore_ssl_errors(self):
+        return self._ignore_ssl_errors
+
+    @ignore_ssl_errors.setter
+    def ignore_ssl_errors(self, val):
+        self._ignore_ssl_errors = val
+
+
 class Modifiers(IntEnum):
     Alt = int(QtCore.Qt.KeyboardModifier.AltModifier)
     Control = int(QtCore.Qt.KeyboardModifier.ControlModifier)
@@ -680,10 +701,12 @@ class Specter(object):
 
     def __init__(self, **options):
         self.webview = None
+        self.manager = NetworkAccessManager()
         self.FrameClass = options.get('frame_class', SpecterWebFrame)
         self.PageClass = options.get('page_class', SpecterWebPage)
         self.frame_registry = FrameRegistry(self.FrameClass, self.app)
         self.page = self.PageClass(self.app, self.frame_registry)
+        self.page.setNetworkAccessManager(self.manager)
 
         QtWebKit.QWebSettings.setMaximumPagesInCache(0)
         QtWebKit.QWebSettings.setObjectCacheCapacities(0, 0, 0)
