@@ -16,8 +16,6 @@ PYTEST_ARGS := --cov specter --cov-report term-missing --timeout=90 ${PARALLEL_A
 # ----------------------------------------------------------------------
 
 test:
-	@free -m
-	@ulimit -a
 	@py.test ${PYTEST_ARGS} specter
 
 watch_test:
