@@ -18,9 +18,10 @@ import tornado.ioloop
 import tornado.wsgi
 from tornado import netutil
 
-from bottle import Bottle, static_file
+from .bottle import Bottle, static_file
+from .helpers import *
 
-sys.path.insert(0, path.abspath(path.join(path.dirname(__file__), '..', '..')))
+ensure_in_path(path.abspath(path.join(path.dirname(__file__), '..', '..')))
 from specter import Specter
 
 
@@ -55,7 +56,7 @@ class ServerThread(threading.Thread):
         self.ioloop.add_callback(self.ioloop.stop)
 
 
-class SpecterTestCase(unittest.TestCase):
+class SpecterTestCase(BaseTestCase):
     SPECTER_OPTIONS = {}
 
     def setupApp(self, app):

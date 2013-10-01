@@ -1,7 +1,6 @@
-import unittest
-
 # Import this so the paths are added to sys.path as a side-effect.
-from util import SpecterTestCase        # noqa
+from .util import SpecterTestCase        # noqa
+from .helpers import BaseTestCase
 
 from specter.util import proxy_factory, patch
 
@@ -26,7 +25,7 @@ class Underlying(object):
         self.x = 1
 
 
-class TestProxyFactory(unittest.TestCase):
+class TestProxyFactory(BaseTestCase):
     def setUp(self):
         u = Underlying()
         pf = proxy_factory(Underlying, lambda _: u)
@@ -38,34 +37,34 @@ class TestProxyFactory(unittest.TestCase):
         self.c = HasProxies()
 
     def test_with_function(self):
-        self.assertEqual(self.c.func(1), 2)
+        self.assert_equal(self.c.func(1), 2)
 
     def test_property_getter(self):
-        self.assertEqual(self.c.prop, 1)
+        self.assert_equal(self.c.prop, 1)
 
     def test_property_setter(self):
         self.c.prop = 2
-        self.assertEqual(self.c.prop, 2)
+        self.assert_equal(self.c.prop, 2)
 
     def test_property_deleter(self):
         self.c.prop = 2
         del self.c.prop
-        self.assertEqual(self.c.prop, 1)
+        self.assert_equal(self.c.prop, 1)
 
 
-class TestPatch(unittest.TestCase):
+class TestPatch(BaseTestCase):
     def setUp(self):
         self.val = 1
         #self.nonexisting = xxx
 
     def test_simple_patch(self):
-        self.assertEqual(self.val, 1)
+        self.assert_equal(self.val, 1)
         with patch(self, 'val', 2):
-            self.assertEqual(self.val, 2)
-        self.assertEqual(self.val, 1)
+            self.assert_equal(self.val, 2)
+        self.assert_equal(self.val, 1)
 
     def test_nonexistant_attr(self):
         self.assertFalse(hasattr(self, 'nonexisting'))
         with patch(self, 'nonexisting', 3):
-            self.assertEqual(self.nonexisting, 3)
+            self.assert_equal(self.nonexisting, 3)
         self.assertFalse(hasattr(self, 'nonexisting'))

@@ -1,7 +1,7 @@
 from specter import InteractionError
 from specter.signals import *
 
-from util import StaticSpecterTestCase
+from .util import StaticSpecterTestCase
 
 
 class SignalTestCase(StaticSpecterTestCase):
@@ -24,31 +24,31 @@ class TestSignals(SignalTestCase):
     def test_load_started_signal(self):
         load_started.connect(self.sig)
         self.open('/')
-        self.assertEqual(self.calls, 1)
+        self.assert_equal(self.calls, 1)
 
     def test_load_progress_signal(self):
         load_progress.connect(self.sig)
         self.open('/')
-        self.assertTrue(self.calls >= 1)
+        self.assert_true(self.calls >= 1)
 
     def test_load_finished_signal(self):
         load_finished.connect(self.sig)
         self.open('/')
-        self.assertEqual(self.calls, 1)
-        self.assertTrue(self.kwargs[0]['ok'] is True)
+        self.assert_equal(self.calls, 1)
+        self.assert_true(self.kwargs[0]['ok'] is True)
 
     def test_console_signal(self):
         js_console.connect(self.sig)
         self.open('/')
-        self.assertEqual(self.calls, 1)
+        self.assert_equal(self.calls, 1)
 
         args = self.kwargs[0]
 
-        self.assertEqual(args['message'], 'Hello world')
-        self.assertEqual(args['source'], self.baseUrl + '/signals1.js')
+        self.assert_equal(args['message'], 'Hello world')
+        self.assert_equal(args['source'], self.baseUrl + '/signals1.js')
 
         # TODO: this fails - why?
-        #self.assertEqual(args['line'], 4)
+        #self.assert_equal(args['line'], 4)
 
 
 class TestAlert(SignalTestCase):
@@ -57,8 +57,8 @@ class TestAlert(SignalTestCase):
     def test_alert(self):
         js_alert.connect(self.sig)
         self.open('/')
-        self.assertEqual(self.calls, 1)
-        self.assertEqual(self.kwargs[0]['message'], 'This is an alert')
+        self.assert_equal(self.calls, 1)
+        self.assert_equal(self.kwargs[0]['message'], 'This is an alert')
 
 
 class TestPrompt(SignalTestCase):
@@ -77,10 +77,10 @@ class TestPrompt(SignalTestCase):
         js_alert.connect(self.alert_sig)
         self.open('/')
 
-        self.assertEqual(self.calls, 1)
-        self.assertEqual(self.kwargs[0][0], 'Prompt?')
-        self.assertEqual(self.kwargs[0][1], "default val")
-        self.assertEqual(self.message, 'out: prompt response')
+        self.assert_equal(self.calls, 1)
+        self.assert_equal(self.kwargs[0][0], 'Prompt?')
+        self.assert_equal(self.kwargs[0][1], "default val")
+        self.assert_equal(self.message, 'out: prompt response')
 
     def test_prompt_error(self):
         # TODO: this gets raised in a different thread or something...
@@ -104,9 +104,9 @@ class TestConfirm(SignalTestCase):
         js_alert.connect(self.alert_sig)
         self.open('/')
 
-        self.assertEqual(self.calls, 1)
-        self.assertEqual(self.kwargs[0], 'Confirm?')
-        self.assertEqual(self.message, 'out: true')
+        self.assert_equal(self.calls, 1)
+        self.assert_equal(self.kwargs[0], 'Confirm?')
+        self.assert_equal(self.message, 'out: true')
 
     def test_confirm_error(self):
         # TODO: this gets raised in a different thread or something...

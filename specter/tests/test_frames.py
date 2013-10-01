@@ -1,7 +1,7 @@
 import os
 
-from util import StaticSpecterTestCase
-from bottle import static_file
+from .util import StaticSpecterTestCase
+from .bottle import static_file
 
 
 class TestFrames(StaticSpecterTestCase):
@@ -10,15 +10,15 @@ class TestFrames(StaticSpecterTestCase):
     def test_frame_names(self):
         self.open('/')
         frames = self.s.page.main_frame.child_frames
-        self.assertEqual(len(frames), 2)
-        self.assertEqual(frames[0].name, 'frame_a')
-        self.assertEqual(frames[1].name, 'frame_b')
+        self.assert_equal(len(frames), 2)
+        self.assert_equal(frames[0].name, 'frame_a')
+        self.assert_equal(frames[1].name, 'frame_b')
 
     def test_frame_urls(self):
         self.open('/')
         frames = self.s.page.main_frame.child_frames
-        self.assertEqual(frames[0].requested_url, self.baseUrl + '/frame_a.html')
-        self.assertEqual(frames[1].requested_url, self.baseUrl + '/frame_b.html')
+        self.assert_equal(frames[0].requested_url, self.baseUrl + '/frame_a.html')
+        self.assert_equal(frames[1].requested_url, self.baseUrl + '/frame_b.html')
 
     def test_frame_navigation(self):
         self.open('/')
@@ -27,14 +27,14 @@ class TestFrames(StaticSpecterTestCase):
         self.s.wait_for_page_load()
 
         frames = self.s.page.main_frame.child_frames
-        self.assertEqual(frames[0].requested_url, frames[1].requested_url)
+        self.assert_equal(frames[0].requested_url, frames[1].requested_url)
 
     def test_frame_parent(self):
         self.open('/')
         frames = self.s.page.main_frame.child_frames
 
-        self.assertEqual(frames[0].parent, self.s.page.main_frame)
+        self.assert_equal(frames[0].parent, self.s.page.main_frame)
 
     def test_no_parent(self):
         self.open('/')
-        self.assertTrue(self.s.page.main_frame.parent is None)
+        self.assert_true(self.s.page.main_frame.parent is None)

@@ -1,8 +1,8 @@
 import os
 import unittest
 
-from util import SpecterTestCase, StaticSpecterTestCase
-from bottle import redirect, static_file
+from .util import SpecterTestCase, StaticSpecterTestCase
+from .bottle import redirect, static_file
 
 
 class TestSimple(StaticSpecterTestCase):
@@ -10,7 +10,7 @@ class TestSimple(StaticSpecterTestCase):
 
     def test_simple_and_sleep(self):
         self.open('/')
-        self.assertTrue('This is an index page' in self.s.content)
+        self.assert_in('This is an index page', self.s.content)
 
     def test_wait_for(self):
         self.open('/')
@@ -22,13 +22,13 @@ class TestSimple(StaticSpecterTestCase):
 
     def test_url(self):
         self.open('/')
-        self.assertEqual(self.s.url,
+        self.assert_equal(self.s.url,
                          self.baseUrl + '/'
                          )
 
     def test_title(self):
         self.open('/')
-        self.assertEqual(self.s.title, 'This is a title')
+        self.assert_equal(self.s.title, 'This is a title')
 
 
 if __name__ == "__main__":
