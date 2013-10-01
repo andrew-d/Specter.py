@@ -9,6 +9,7 @@ import blinker
 from .util import proxy_factory, patch
 from .signals import *
 from .exceptions import *
+from .six import PY3, string_types, byte2int
 
 PYSIDE = False
 try:
@@ -632,8 +633,16 @@ class SpecterWebPage(QtWebKit.QWebPage):
         key = 0
         if isinstance(keys, Number):
             key = int(keys)
-        elif isinstance(keys, str) and len(keys) > 0:
-            key = ord(keys[0])
+        elif isinstance(keys, string_types) and len(keys) > 0:
+            # Handle all four cases here - Python 2/3, unicode/bytes
+            if PY3:
+                if isinstance(keys, str):
+                    key = ord(keys[0])
+                elif isinstance(keys, bytes):
+                    key = keys[0]
+            else:
+                if isinstance(keys, basestring):
+                    key = ord(keys[0])
 
         if modifiers is None:
             modifiers = Modifiers.No

@@ -1,5 +1,7 @@
 [run]
-omit = specter/tests/*
+omit =
+    specter/tests/*
+    specter/six.py
 
 [report]
 exclude_lines =
