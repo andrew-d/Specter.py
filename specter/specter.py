@@ -329,7 +329,7 @@ class SpecterWebFrame(object):
                 # We patch our parent page's file-upload value to be the given
                 # value, so that the following JavaScript will result in the
                 # given file being selected.
-                page = self.page()
+                page = self._frame.page()
                 with patch(page, '_file_to_upload', value):
                     # Trigger a click in Javascript.
                     self.evaluate("""

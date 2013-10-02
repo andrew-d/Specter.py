@@ -241,5 +241,3 @@ def parametrize(klass):
     that it uses the ParametrizingMetaclass in a Python 2/3 agnostic manner.
     """
     return ParametrizingMetaclass(klass.__name__, klass.__bases__, klass.__dict__)
-
-

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <body>
-    <form name="form">
+    <form name="mainform" action="/submit" method="POST" enctype="multipart/form-data">
       <label><input type="checkbox" name="checkbox" id="checkbox" value="checkbox"> Check</label>
       <hr/>
       <label><input type="radio" name="radio" id="radio1" value="radio1"> Radio 1</label>
@@ -36,26 +36,5 @@
       <input type="week" name="week" id="week"/><br/>
       <input type="" name="empty" id="empty"/><br/>
     </form>
-
-    <script src="/jquery-1.10.2.min.js"></script>
-    <script>
-      var onChanged = function(e) {
-        console.log("change start");
-        var el = $(e.target);
-        var val;
-        if( el.is('input') && el.attr('type').toLowerCase() === 'checkbox' ) {
-          val = el.is(':checked');
-        } else if( el.val() !== undefined ) {
-          val = el.val();
-        } else {
-          val = "<unknown>";
-        }
-        console.log(e.target.tagName.toLowerCase() + "\t" + val);
-      };
-
-      $("form").on('change', onChanged);
-
-      console.log("Active");
-    </script>
   </body>
 </html>

@@ -1,46 +1,104 @@
+import os
+from threading import Event
+
 from PySide import QtWebKit
 
-from .util import StaticSpecterTestCase
+from specter.specter import ElementError
+from .util import SpecterTestCase, parameters, parametrize
+from .bottle import request, static_file
 
-from specter import js_console
+
+root = os.path.join(
+    os.path.abspath(os.path.dirname(__file__)),
+    'static'
+)
 
 
-class TestFrames(StaticSpecterTestCase):
+@parametrize
+class TestForms(SpecterTestCase):
     STATIC_FILE = 'forms.html'
 
-    def setUp(self):
-        super(TestFrames, self).setUp()
-        self.console = []
-        js_console.connect(self.onConsole)
+    def setupApp(self, app):
+        # We run our application in another thread, so we need to wait for it
+        # to be finished with the route before we check the form data.  This
+        # event will be triggered when the submit route is done.
+        self.submitted = Event()
 
-    def tearDown(self):
-        super(TestFrames, self).tearDown()
-        js_console.disconnect(self.onConsole)
+        @app.route('/')
+        def index():
+            return static_file('forms.html', root=root)
 
-    def onConsole(self, sender, message, line, source):
-        print("Console message: %s" % (message,))
-        self.console.append(message)
+        @app.route('/submit', method="POST")
+        def submit():
+            print("Submitted: " + str(request.forms))
+            self.forms = request.forms
+            self.files = request.files
+            self.query = request.query
+            self.submitted.set()
+
+    def fill(self, selector, val):
+        self.open('/')
+        self.s.set_field_value(selector, val)
+        self.s.app.processEvents()
+        self.s.evaluate('document.mainform.submit();')
+        self.s.wait_for(lambda: self.submitted.is_set())
 
     def test_checkbox(self):
-        self.open('/')
-        self.s.set_field_value("input[name='checkbox']", 'checkbox')
-        self.s.app.processEvents()
-        self.assertEqual(self.console[-1], 'checkbox\tchecked')
+        self.fill("input[name='checkbox']", 'checkbox')
+        self.assert_equal(self.forms.get('checkbox'), 'checkbox')
 
-        self.s.set_field_value("input[name='checkbox']", 'notfound')
-        self.s.app.processEvents()
-        self.assertEqual(self.console[-1], 'checkbox\tunchecked')
+    def test_checkbox_unchecked(self):
+        self.fill("input[name='checkbox']", 'notfound')
+        self.assert_equal(self.forms.get('checkbox'), None)
 
     def test_textarea(self):
-        self.open('/')
+        self.fill('textarea', 'this is some text')
+        self.assert_equal(self.forms.get('textarea'), 'this is some text')
 
-        # import webbrowser
-        # webbrowser.open(self.baseUrl)
-        self.s.webview.show_inspector()
-        self.s.sleep(10)
+    def test_radio(self):
+        self.fill("input[name='radio']", 'radio1')
+        self.assert_equal(self.forms.get('radio'), 'radio1')
 
-        self.s.set_field_value('textarea', 'some text')
-        self.s.app.processEvents()
-        self.s.sleep(100)
+    def test_select(self):
+        self.fill("select", "select3")
+        self.assert_equal(self.forms.get('select'), 'select3')
 
-        self.assertEqual(self.console[-1], 'textarea\tsome text')
+
+    TEXT_FIELD_PARAMS = [
+        ('color', '#FFFFFF'),
+        ('date', '10/25/2013'),
+        ('datetime', '10/25/2013 11:00 AM'),
+        ('datetime-local', '10/25/2013 11:00 AM'),
+        ('email', 'foo@bar.com'),
+        ('hidden', 'hidden'),
+        ('month', 'October 2013'),
+        ('number', '12345'),
+        ('password', 'secure'),
+        ('range', '56'),
+        ('search', 'query'),
+        ('tel', '555-555-1234'),
+        ('text', 'this is text'),
+        ('time', '11:05 AM'),
+        ('url', 'http://www.google.com'),
+        ('week', 'Week 41, 2013'),
+        ('empty', 'empty field'),
+    ]
+
+    @parameters(TEXT_FIELD_PARAMS)
+    def test_text_field(self, param):
+        id, val = param
+        print("Testing field with ID '%s' and value '%s'" % (id, val))
+        self.fill('#' + id, val)
+        self.assert_equal(self.forms.get(id), val)
+
+    def test_bad_selector(self):
+        with self.assert_raises(ElementError):
+            self.s.set_field_value('badsel', 'foo')
+
+    def test_file_upload(self):
+        self.fill('#file', os.path.join(root, 'upload.txt'))
+        f = self.files.get('file')
+        data = f.file.read()
+
+        self.assert_equal(data.strip(), 'foobar')
+        self.assert_equal(f.filename, 'upload.txt')
