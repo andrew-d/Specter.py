@@ -1,3 +1,5 @@
+from PySide import QtWebKit
+
 from .util import StaticSpecterTestCase
 
 from specter import js_console
@@ -31,11 +33,14 @@ class TestFrames(StaticSpecterTestCase):
 
     def test_textarea(self):
         self.open('/')
-        self.s.set_field_value('textarea', 'some text')
-        self.s.app.processEvents()
 
         # import webbrowser
         # webbrowser.open(self.baseUrl)
-        # self.s.sleep(100)
+        self.s.webview.show_inspector()
+        self.s.sleep(10)
+
+        self.s.set_field_value('textarea', 'some text')
+        self.s.app.processEvents()
+        self.s.sleep(100)
 
         self.assertEqual(self.console[-1], 'textarea\tsome text')

@@ -685,6 +685,15 @@ class SizedWebView(QtWebKit.QWebView):
     def sizeHint(self):
         return QSize(*self.__size)
 
+    def show_inspector(self):
+        self.settings().setAttribute(
+            QtWebKit.QWebSettings.WebAttribute.DeveloperExtrasEnabled,
+            True
+        )
+        self.inspect = QtWebKit.QWebInspector()
+        self.inspect.setPage(self.page())
+        self.inspect.show()
+
 
 # FIXME: these won't handle custom classes!
 page_proxy = proxy_factory(SpecterWebPage, lambda self: self.page)
