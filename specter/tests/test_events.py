@@ -7,12 +7,12 @@ class TestMouseEvents(StaticSpecterTestCase):
     STATIC_FILE = 'events.html'
 
     def setUp(self):
-        super(TestFrames, self).setUp()
+        super(TestMouseEvents, self).setUp()
         self.console = []
         js_console.connect(self.onConsole)
 
     def tearDown(self):
-        super(TestFrames, self).tearDown()
+        super(TestMouseEvents, self).tearDown()
         js_console.disconnect(self.onConsole)
 
     def onConsole(self, sender, message, line, source):

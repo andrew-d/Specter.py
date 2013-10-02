@@ -38,4 +38,4 @@ class TestFrames(StaticSpecterTestCase):
         # webbrowser.open(self.baseUrl)
         # self.s.sleep(100)
 
-        self.assertEqual(self.console[0], 'textarea\tsome text')
+        self.assertEqual(self.console[-1], 'textarea\tsome text')
