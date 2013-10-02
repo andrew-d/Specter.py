@@ -1,7 +1,4 @@
-import os
-
 from .util import StaticSpecterTestCase
-from .bottle import static_file
 
 
 class TestFrames(StaticSpecterTestCase):

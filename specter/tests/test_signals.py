@@ -38,8 +38,9 @@ class TestSignals(SignalTestCase):
         self.assert_true(self.kwargs[0]['ok'] is True)
 
     def test_console_signal(self):
-        js_console.connect(self.sig)
-        self.open('/')
+        with js_console.connected_to(self.sig):
+            self.open('/')
+
         self.assert_equal(self.calls, 1)
 
         args = self.kwargs[0]

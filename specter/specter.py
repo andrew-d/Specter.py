@@ -18,7 +18,7 @@ try:
                                  QNetworkCookieJar, QNetworkDiskCache, \
                                  QNetworkProxy, QNetworkCookie
     from PySide import QtCore
-    from PySide.QtCore import QSize, QByteArray, QUrl, QDateTime, \
+    from PySide.QtCore import QSize, QPoint, QByteArray, QUrl, QDateTime, \
                               QtCriticalMsg, QtDebugMsg, QtFatalMsg, \
                               QtWarningMsg, qInstallMsgHandler
     from PySide.QtGui import QApplication, QImage, QPainter, QPrinter, \
@@ -445,6 +445,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
     def __init__(self, app, registry):
         super(SpecterWebPage, self).__init__(app)
 
+        self.app = app
         self.registry = registry
         self.loaded = False
 
@@ -591,7 +592,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
         y = int(y)
         eventType = self._mouse_mapping.get(type, None)
         if eventType is None:
-            raise ValueError('Invalid keyboard event type: %s' % (type,))
+            raise ValueError('Invalid mouse event type: %s' % (type,))
 
         if button == 'left':
             buttonObj = QtCore.Qt.LeftButton
@@ -602,7 +603,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
         else:
             raise ValueError('Invalid mouse button: %s' % (button,))
 
-        event = QMouseEvent(eventType, (x, y), buttonObj, buttonObj,
+        event = QMouseEvent(eventType, QPoint(x, y), buttonObj, buttonObj,
                             QtCore.Qt.NoModifier)
         self.app.postEvent(self, event)
         # TODO: process events?

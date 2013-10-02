@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <form name="form">
+      <label><input type="checkbox" name="checkbox" id="checkbox" value="checkbox"> Check</label>
+      <hr/>
+      <label><input type="radio" name="radio" id="radio1" value="radio1"> Radio 1</label>
+      <label><input type="radio" name="radio" id="radio2" value="radio2"> Radio 2</label>
+      <hr/>
+      <label>File: <input type="file" id="file" name="file"></label>
+      <hr/>
+      <select name="select" id="select">
+        <option value="select1">Select 1</option>
+        <option value="select2">Select 2</option>
+        <option value="select3">Select 3</option>
+        <option value="select4">Select 4</option>
+      </select>
+      <hr/>
+      <textarea name="textarea" id="textarea">Text Area</textarea>
+      <hr/>
+      <input type="color" name="color" id="color"><br/>
+      <input type="date" name="date" id="date"/><br/>
+      <input type="datetime" name="datetime" id="datetime"/><br/>
+      <input type="datetime-local" name="datetime-local" id="datetime-local"/><br/>
+      <input type="email" name="email" id="email"/><br/>
+      <input type="hidden" name="hidden" id="hidden"/><br/>
+      <input type="month" name="month" id="month"/><br/>
+      <input type="number" name="number" id="number"/><br/>
+      <input type="password" name="password" id="password"/><br/>
+      <input type="range" name="range" id="range"/><br/>
+      <input type="search" name="search" id="search"/><br/>
+      <input type="tel" name="tel" id="tel"/><br/>
+      <input type="text" name="text" id="text"/><br/>
+      <input type="time" name="time" id="time"/><br/>
+      <input type="url" name="url" id="url"/><br/>
+      <input type="week" name="week" id="week"/><br/>
+      <input type="" name="empty" id="empty"/><br/>
+    </form>
+
+    <script src="/jquery-1.10.2.min.js"></script>
+    <script>
+      var onChanged = function(e) {
+        console.log("change start");
+        var el = $(e.target);
+        var val;
+        if( el.is('input') && el.attr('type').toLowerCase() === 'checkbox' ) {
+          val = el.is(':checked');
+        } else if( el.val() !== undefined ) {
+          val = el.val();
+        } else {
+          val = "<unknown>";
+        }
+        console.log(e.target.tagName.toLowerCase() + "\t" + val);
+      };
+
+      $("form").on('change', onChanged);
+
+      console.log("Active");
+    </script>
+  </body>
+</html>
