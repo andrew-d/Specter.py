@@ -100,5 +100,5 @@ class TestForms(SpecterTestCase):
         f = self.files.get('file')
         data = f.file.read()
 
-        self.assert_equal(data.strip(), 'foobar')
+        self.assert_equal(data.strip(), b'foobar')
         self.assert_equal(f.filename, 'upload.txt')
