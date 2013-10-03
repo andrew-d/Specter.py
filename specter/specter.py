@@ -639,12 +639,15 @@ class SpecterWebPage(QtWebKit.QWebPage):
             # Handle all four cases here - Python 2/3, unicode/bytes
             if PY3:
                 if isinstance(keys, str):
-                    key = ord(keys[0])
+                    key = ord(keys[0].upper())
                 elif isinstance(keys, bytes):
-                    key = keys[0]
+                    # This is so we don't need to upper-case the whole input
+                    # string - we grab just the first character, upper-case
+                    # it, and then index it to get the character code.
+                    key = keys[0:1].upper()[0]
             else:
                 if isinstance(keys, basestring):
-                    key = ord(keys[0])
+                    key = ord(keys[0].upper())
 
         if modifiers is None:
             modifiers = Modifiers.No

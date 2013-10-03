@@ -63,11 +63,18 @@ class TestKeyboardEvents(StaticSpecterTestCase):
 
     def test_keydown(self):
         self.open('/')
-        # # Focus on the window.
-        # self.s.send_mouse_event('click', 10, 10)
-        # self.s.app.processEvents()
-
         self.s.send_keyboard_event('keydown', 'a')
         self.s.app.processEvents()
 
-        self.assertEqual(self.console[-1], 'keydown: 97')
+        self.assertEqual(self.console[-1], 'keydown: 65,0,0,0,0')
+
+    def test_keyup(self):
+        self.open('/')
+        self.s.send_keyboard_event('keydown', 'a')
+        self.s.app.processEvents()
+        self.s.send_keyboard_event('keyup', 'a')
+        self.s.app.processEvents()
+
+        self.assertEqual(self.console[-1], 'keyup: 65,0,0,0,0')
+
+    # TODO: test modifier keys.
