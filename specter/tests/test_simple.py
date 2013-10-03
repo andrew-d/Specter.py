@@ -45,8 +45,10 @@ class TestSimple(StaticSpecterTestCase):
         self.s.sleep(0.05)
         end = time.time()
 
+        diff = (end - start) - 0.05
         print("Difference: " + str(end - start))
-        self.assert_true(((end - start) - 0.05) < 0.01)
+
+        self.assert_true(diff < 0.01)
 
 
 if __name__ == "__main__":

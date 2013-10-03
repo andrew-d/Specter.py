@@ -44,7 +44,7 @@ except ImportError:
 logger = logging.getLogger('specter')
 
 
-class QTMessageProxy(object):
+class QtMessageProxy(object):
     _mapping = {
         QtDebugMsg: logging.DEBUG,
         QtWarningMsg: logging.WARN,
@@ -621,7 +621,8 @@ class SpecterWebPage(QtWebKit.QWebPage):
         :param modifiers: modifier keys for the given event.
         """
         if type == 'keypress':
-            # TODO: implement
+            self.send_keyboard_event('keydown', keys, modifiers)
+            self.send_keyboard_event('keyup', keys, modifiers)
             return
 
         if type == 'keydown':
@@ -714,7 +715,7 @@ class Specter(object):
     def app(self):
         if not Specter._app:
             Specter._app = QApplication.instance() or QApplication(['specter'])
-            qInstallMsgHandler(QTMessageProxy(False))
+            qInstallMsgHandler(QtMessageProxy(True))
 
         return Specter._app
 

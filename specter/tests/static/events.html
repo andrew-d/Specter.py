@@ -17,6 +17,18 @@
             console.log(e.type.toLowerCase() + ": " + e.pageX + "," + e.pageY);
           });
       });
+      $(function() {
+          $("html").on('keydown keyup', function(e) {
+            var arr = [
+              e.keyCode,
+              e.shiftKey ? 1 : 0,
+              e.altKey ? 1 : 0,
+              e.ctrlKey ? 1 : 0,
+              e.metaKey ? 1 : 0,
+            ];
+            console.log(e.type.toLowerCase() + ": " + arr.join());
+          });
+      });
     </script>
   </body>
 </html>

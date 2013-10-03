@@ -39,3 +39,35 @@ class TestMouseEvents(StaticSpecterTestCase):
         self.s.app.processEvents()
 
         self.assertEqual(self.console[-1], 'click: 3,3')
+
+    def test_invalid_event(self):
+        with self.assert_raises(ValueError):
+            self.s.send_mouse_event('invalid', 1, 1)
+
+
+class TestKeyboardEvents(StaticSpecterTestCase):
+    STATIC_FILE = 'events.html'
+
+    def setUp(self):
+        super(TestKeyboardEvents, self).setUp()
+        self.console = []
+        js_console.connect(self.onConsole)
+
+    def tearDown(self):
+        super(TestKeyboardEvents, self).tearDown()
+        js_console.disconnect(self.onConsole)
+
+    def onConsole(self, sender, message, line, source):
+        print("Console: " + message)
+        self.console.append(message)
+
+    def test_keydown(self):
+        self.open('/')
+        # # Focus on the window.
+        # self.s.send_mouse_event('click', 10, 10)
+        # self.s.app.processEvents()
+
+        self.s.send_keyboard_event('keydown', 'a')
+        self.s.app.processEvents()
+
+        self.assertEqual(self.console[-1], 'keydown: 97')
