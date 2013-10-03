@@ -3,7 +3,7 @@ from .bottle import redirect
 
 
 class TestRedirection(SpecterTestCase):
-    def setupApp(self, app):
+    def setup_app(self, app):
         @app.route('/one')
         def one():
             return b'url one'

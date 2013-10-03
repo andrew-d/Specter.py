@@ -6,9 +6,7 @@
 #   - Assert some result.
 
 import os
-import sys
 import socket
-import unittest
 import threading
 from os import path
 
@@ -59,13 +57,13 @@ class ServerThread(threading.Thread):
 class SpecterTestCase(BaseTestCase):
     SPECTER_OPTIONS = {}
 
-    def setupApp(self, app):
+    def setup_app(self, app):
         pass
 
-    def setUp(self):
+    def setup(self):
         # Create application, and set it up.
         app = Bottle(catchall=False)
-        self.setupApp(app)
+        self.setup_app(app)
         evt = threading.Event()
 
         # Start our application thread.
@@ -83,7 +81,7 @@ class SpecterTestCase(BaseTestCase):
         self.host = self.thread.host
         self.baseUrl = "http://%s:%d" % (self.host, self.port)
 
-    def tearDown(self):
+    def teardown(self):
         # Tell our thread to stop.
         self.thread.stop()
 
@@ -104,7 +102,7 @@ class SpecterTestCase(BaseTestCase):
 class StaticSpecterTestCase(SpecterTestCase):
     STATIC_FILE = ''
 
-    def setupApp(self, app):
+    def setup_app(self, app):
         root = os.path.join(
             os.path.abspath(os.path.dirname(__file__)),
             'static'

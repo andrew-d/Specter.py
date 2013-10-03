@@ -14,7 +14,7 @@
     <script>
       $(function() {
           $('body').on('click mousedown mouseup', function(e) {
-            console.log(e.type.toLowerCase() + ": " + e.pageX + "," + e.pageY);
+            console.log(e.type.toLowerCase() + ": " + e.pageX + "," + e.pageY + "," + e.which);
           });
       });
       $(function() {

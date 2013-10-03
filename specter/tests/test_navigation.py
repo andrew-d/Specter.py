@@ -7,7 +7,7 @@ from .bottle import static_file
 class TestSimple(SpecterTestCase):
     STATIC_FILE = 'nav1.html'
 
-    def setupApp(self, app):
+    def setup_app(self, app):
         root = os.path.join(
             os.path.abspath(os.path.dirname(__file__)),
             'static'

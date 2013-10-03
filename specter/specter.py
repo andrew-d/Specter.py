@@ -235,7 +235,7 @@ class SpecterWebFrame(object):
                         a float) are accepted.
         """
         if timeout is None:
-            timeout = self.timeout
+            timeout = self._timeout
 
         start = time.time()
         while time.time() < (start + timeout):
@@ -434,7 +434,7 @@ class FrameRegistry(object):
         return new
 
     def clear(self):
-        del self._registry[:]
+        self._registry.clear()
 
 
 # FIXME: This won't handle custom classes
@@ -479,7 +479,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
 
     def onUnsupportedContent(self, reply):
         # TODO: fix
-        print('unsupported content!')
+        pass
 
     # ----------------------------------------------------------------------
     # -------------------------- Abstract Methods --------------------------
@@ -637,7 +637,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
             key = int(keys)
         elif isinstance(keys, string_types) and len(keys) > 0:
             # Handle all four cases here - Python 2/3, unicode/bytes
-            if PY3:
+            if PY3:                                 # pragma: no cover
                 if isinstance(keys, str):
                     key = ord(keys[0].upper())
                 elif isinstance(keys, bytes):
@@ -645,7 +645,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
                     # string - we grab just the first character, upper-case
                     # it, and then index it to get the character code.
                     key = keys[0:1].upper()[0]
-            else:
+            else:                                   # pragma: no cover
                 if isinstance(keys, basestring):
                     key = ord(keys[0].upper())
 
@@ -681,7 +681,7 @@ class SpecterWebPage(QtWebKit.QWebPage):
     content         = frame_proxy('content')
 
 
-class SizedWebView(QtWebKit.QWebView):
+class SizedWebView(QtWebKit.QWebView):                      # pragma: no cover
     def __init__(self, size, *args, **kwargs):
         self.__size = size
         super(SizedWebView, self).__init__(*args, **kwargs)
@@ -757,7 +757,7 @@ class Specter(object):
         self.viewport_size = options.get('viewport_size', (800, 600))
 
         # Create webview if we are to display things.
-        if options.get('display', False):
+        if options.get('display', False):                   # pragma: no cover
             self.webview = SizedWebView(self._viewport_size)
             self.webview.setPage(self.page)
             self.webview.show()

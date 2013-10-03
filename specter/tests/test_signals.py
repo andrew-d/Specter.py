@@ -5,8 +5,8 @@ from .util import StaticSpecterTestCase
 
 
 class SignalTestCase(StaticSpecterTestCase):
-    def setUp(self):
-        super(SignalTestCase, self).setUp()
+    def setup(self):
+        super(SignalTestCase, self).setup()
         self.calls = 0
         self.senders = []
         self.kwargs = []

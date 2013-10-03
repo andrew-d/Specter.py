@@ -3,7 +3,7 @@ from threading import Event
 
 from PySide import QtWebKit
 
-from specter.specter import ElementError
+from specter.specter import ElementError, SpecterError
 from .util import SpecterTestCase, parameters, parametrize
 from .bottle import request, static_file
 
@@ -18,7 +18,7 @@ root = os.path.join(
 class TestForms(SpecterTestCase):
     STATIC_FILE = 'forms.html'
 
-    def setupApp(self, app):
+    def setup_app(self, app):
         # We run our application in another thread, so we need to wait for it
         # to be finished with the route before we check the form data.  This
         # event will be triggered when the submit route is done.
@@ -102,3 +102,11 @@ class TestForms(SpecterTestCase):
 
         self.assert_equal(data.strip(), b'foobar')
         self.assert_equal(f.filename, 'upload.txt')
+
+    def test_invalid_field(self):
+        with self.assert_raises(SpecterError):
+            self.fill("#button", "Can't fill me")
+
+    def test_invalid_input_field(self):
+        with self.assert_raises(SpecterError):
+            self.fill("input[name='badinput']", 'badinput')

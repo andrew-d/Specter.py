@@ -26,7 +26,7 @@ class Underlying(object):
 
 
 class TestProxyFactory(BaseTestCase):
-    def setUp(self):
+    def setup(self):
         u = Underlying()
         pf = proxy_factory(Underlying, lambda _: u)
 
@@ -53,7 +53,7 @@ class TestProxyFactory(BaseTestCase):
 
 
 class TestPatch(BaseTestCase):
-    def setUp(self):
+    def setup(self):
         self.val = 1
         #self.nonexisting = xxx
 

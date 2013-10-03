@@ -50,6 +50,16 @@ class TestSimple(StaticSpecterTestCase):
 
         self.assert_true(diff < 0.01)
 
+    def test_default_viewport(self):
+        self.assert_equal(self.s.viewport_size, (800, 600))
+
+    def test_timeout(self):
+        self.assert_equal(self.s.page.main_frame.timeout, 90)
+
+        # TODO: should test this is being used?
+        self.s.page.main_frame.timeout = 120
+        self.assert_equal(self.s.page.main_frame.timeout, 120)
+
 
 if __name__ == "__main__":
     unittest.main()
