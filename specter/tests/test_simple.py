@@ -46,8 +46,6 @@ class TestSimple(StaticSpecterTestCase):
         end = time.time()
 
         diff = (end - start) - 0.05
-        print("Difference: " + str(end - start))
-
         self.assert_true(diff < 0.01)
 
     def test_default_viewport(self):

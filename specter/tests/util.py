@@ -110,10 +110,10 @@ class StaticSpecterTestCase(SpecterTestCase):
 
         @app.route('/<path:path>')
         def rest(path):
-            print("Serving static file: %s" % (path,))
+            #print("Serving static file: %s" % (path,))
             return static_file(filename=path, root=root)
 
         @app.route('/')
         def index():
-            print("Serving static file: %s" % (self.STATIC_FILE,))
+            #print("Serving static file: %s" % (self.STATIC_FILE,))
             return static_file(filename=self.STATIC_FILE, root=root)

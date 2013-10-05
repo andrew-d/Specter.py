@@ -16,7 +16,6 @@ class TestSimple(SpecterTestCase):
 
         @app.route('/<path:path>')
         def rest(path):
-            print("Serving static file: %s" % (path,))
             self.served += 1
             return static_file(filename=path, root=root)
 

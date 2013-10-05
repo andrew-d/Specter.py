@@ -16,7 +16,6 @@ class TestMouseEvents(StaticSpecterTestCase):
         js_console.remove_listener(self.onConsole)
 
     def onConsole(self, sender, message, line, source):
-        print("Console: " + message)
         self.console.append(message)
 
     def test_mousedown(self):
@@ -76,7 +75,6 @@ class TestKeyboardEvents(StaticSpecterTestCase):
         js_console.remove_listener(self.onConsole)
 
     def onConsole(self, sender, message, line, source):
-        print("Console: " + message)
         self.console.append(message)
 
     def test_keydown(self):

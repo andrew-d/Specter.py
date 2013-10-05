@@ -30,7 +30,6 @@ class TestForms(SpecterTestCase):
 
         @app.route('/submit', method="POST")
         def submit():
-            print("Submitted: " + str(request.forms))
             self.forms = request.forms
             self.files = request.files
             self.query = request.query
@@ -87,7 +86,6 @@ class TestForms(SpecterTestCase):
     @parameters(TEXT_FIELD_PARAMS)
     def test_text_field(self, param):
         id, val = param
-        print("Testing field with ID '%s' and value '%s'" % (id, val))
         self.fill('#' + id, val)
         self.assert_equal(self.forms.get(id), val)
 

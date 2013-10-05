@@ -746,8 +746,6 @@ class Specter(object):
     def __del__(self):                      # pragma: no cover
         if self.webview is not None:
             self.webview.close()
-        self.app.quit()
-
         del self.page
 
     @property

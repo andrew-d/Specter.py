@@ -188,8 +188,6 @@ class TestPrompt(SignalTestCase):
         js_alert.add_listener(self.alert_sig)
         self.open('/')
 
-        print(self.args)
-
         self.assert_equal(self.calls, 1)
         self.assert_equal(self.args[0][0], 'Prompt?')
         self.assert_equal(self.args[0][1], "default val")
