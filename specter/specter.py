@@ -4,8 +4,6 @@ from numbers import Number
 from weakref import WeakKeyDictionary
 from enum import IntEnum
 
-import blinker
-
 from .util import proxy_factory, patch
 from .signals import *
 from .exceptions import *
