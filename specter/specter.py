@@ -71,7 +71,7 @@ class NetworkAccessManager(QNetworkAccessManager):
         self.sslErrors.connect(self.handleSslErrors)
 
     def handleSslErrors(self, reply, errors):
-        ssl_error.send(self, errors=errors)
+        ssl_error.emit(self, errors)
         if self._ignore_ssl_errors:
             reply.ignoreSslErrors()
 
@@ -468,14 +468,14 @@ class SpecterWebPage(QtWebKit.QWebPage):
 
     def onLoadStarted(self):
         self.loaded = False
-        load_started.send(self)
+        load_started.emit(self)
 
     def onLoadProgress(self, progress):
-        load_progress.send(self, progress=progress)
+        load_progress.emit(self, progress)
 
     def onLoadFinished(self, ok):
         self.loaded = True
-        load_finished.send(self, ok=ok)
+        load_finished.emit(self, ok)
 
     def onUnsupportedContent(self, reply):
         # TODO: fix
@@ -489,49 +489,32 @@ class SpecterWebPage(QtWebKit.QWebPage):
         return self._file_to_upload
 
     def javaScriptAlert(self, frame, message):
-        js_alert.send(self.registry.wrap(frame), message=message)
+        js_alert.emit(self.registry.wrap(frame), message)
 
     def javaScriptConfirm(self, frame, message):
-        if not js_confirm.receivers:
+        if not js_confirm.has_callback:
             raise InteractionError("No handler set for JavaScript confirm!")
 
-        ret = js_confirm.send(self.registry.wrap(frame), message=message)
-
-        # Take the first boolean value.
-        response = False
-        for responder, val in ret:
-            if isinstance(val, bool):
-                response = val
-                break
-
-        return response
+        ret = js_confirm.emit(self.registry.wrap(frame), message)
+        return bool(ret)
 
     def javaScriptPrompt(self, frame, message, defaultValue, result=None):
-        if not js_prompt.receivers:
+        if not js_prompt.has_callback:
             raise InteractionError("No handler set for JavaScript prompt!")
 
-        ret = js_prompt.send(self.registry.wrap(frame),
-                             message=message, default=defaultValue)
-
-        # We take the first non-empty return value, since blinker returns all
-        # return values as a list.
-        response = ''
-        for responder, val in ret:
-            if len(val) > 0 and isinstance(val, str):
-                response = val
-                break
+        ret = js_prompt.emit(self.registry.wrap(frame), message, defaultValue)
 
         # NOTE: The final 'result' parameter differs between PySide and PyQt.
         if result is None:      # pragma: no cover
-            return True, response
+            return True, ret
         else:                   # pragma: no cover
-            result.append(response)
+            result.append(ret)
             return True
 
     def javaScriptConsoleMessage(self, message, line, source):
         super(SpecterWebPage, self).javaScriptConsoleMessage(message, line,
                                                              source)
-        js_console.send(self, message=message, line=line, source=source)
+        js_console.emit(self, message, line, source)
 
     # ----------------------------------------------------------------------
     # ------------------------- Page-Level Methods -------------------------

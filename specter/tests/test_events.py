@@ -9,11 +9,11 @@ class TestMouseEvents(StaticSpecterTestCase):
     def setup(self):
         super(TestMouseEvents, self).setup()
         self.console = []
-        js_console.connect(self.onConsole)
+        js_console.add_listener(self.onConsole)
 
     def teardown(self):
         super(TestMouseEvents, self).teardown()
-        js_console.disconnect(self.onConsole)
+        js_console.remove_listener(self.onConsole)
 
     def onConsole(self, sender, message, line, source):
         print("Console: " + message)
@@ -69,11 +69,11 @@ class TestKeyboardEvents(StaticSpecterTestCase):
     def setup(self):
         super(TestKeyboardEvents, self).setup()
         self.console = []
-        js_console.connect(self.onConsole)
+        js_console.add_listener(self.onConsole)
 
     def teardown(self):
         super(TestKeyboardEvents, self).teardown()
-        js_console.disconnect(self.onConsole)
+        js_console.remove_listener(self.onConsole)
 
     def onConsole(self, sender, message, line, source):
         print("Console: " + message)

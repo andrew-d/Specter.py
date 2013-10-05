@@ -83,7 +83,7 @@ class TestSSLInvalidCert(BaseTestCase):
         self.url = "https://%s:%d/" % (self.host, self.port)
 
         self.msgs = []
-        ssl_error.connect(self.on_ssl_error)
+        ssl_error.add_listener(self.on_ssl_error)
 
     def teardown(self):
         self.thread.stop()
