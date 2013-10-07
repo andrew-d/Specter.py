@@ -9,7 +9,7 @@ else
 endif
 
 # Arguments for py.test
-PYTEST_ARGS := --cov specter --cov-report term-missing --timeout=90 ${PARALLEL_ARGS}
+PYTEST_ARGS := --cov specter --cov-report term-missing --timeout=90 ${PARALLEL_ARGS} ${PYTEST_EXTRA_ARGS}
 
 # ----------------------------------------------------------------------
 # ------------------------------ Commands ------------------------------
