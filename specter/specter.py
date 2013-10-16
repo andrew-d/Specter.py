@@ -95,7 +95,6 @@ class SpecterWebFrame(object):
         self._frame = underlying
         self.registry = registry
         self.app = app
-        self._loaded = False
         self._timeout = 90      # Matches 'network.http.connection-timeout'
                                 # from Firefox
 
