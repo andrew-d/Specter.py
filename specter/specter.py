@@ -339,7 +339,7 @@ class SpecterWebFrame(object):
 
                     # Ensure events are processed.
                     # TODO: want to do this?
-                    self.app.processEvents()
+                    #self.app.processEvents()
 
             else:
                 raise SpecterError('Unable to set the value of input field of '
